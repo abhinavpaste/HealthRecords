@@ -7,6 +7,7 @@ import { AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import AlertCard from "@/components/alert-card";
 import LoadingStateComponent from "@/components/loading-card";
+import MissingWalletComponent from "@/components/missing-wallet";
 
 import { client } from "@/app/client";
 import { resolveScheme } from "thirdweb/storage";

@@ -59,17 +59,30 @@ const usersRouter = new Hono()
       const currentRole = (await client.users.getUser(auth.userId))
         .publicMetadata.role;
 
-      if (currentRole) return c.json({ error: "User already has role" }, 401);
-
-      client.users.updateUserMetadata(auth.userId, {
-        publicMetadata: { role: data.role },
+      // Check if user already exists in DB
+      const existingUser = await db.query.users.findFirst({
+        where: (user, { eq }) => eq(user.id, auth.userId),
       });
-      const createdUser = await db
-        .insert(users)
-        .values({ ...data, id: auth.userId })
-        .returning();
 
-      return c.json(createdUser[0], 201);
+      // If role set in Clerk AND user exists in DB, they're fully set up
+      if (currentRole && existingUser)
+        return c.json({ error: "User already has role" }, 401);
+
+      // If not in DB yet, insert them (even if Clerk role already set)
+      if (!existingUser) {
+        if (!currentRole) {
+          client.users.updateUserMetadata(auth.userId, {
+            publicMetadata: { role: data.role },
+          });
+        }
+        const createdUser = await db
+          .insert(users)
+          .values({ ...data, id: auth.userId })
+          .returning();
+        return c.json(createdUser[0], 201);
+      }
+
+      return c.json(existingUser, 201);
     },
   );
 

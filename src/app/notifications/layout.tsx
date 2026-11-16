@@ -22,12 +22,10 @@ export default async function NotificationsLayout({
   if (!role) redirect("/role-select");
   return (
     <div className="flex min-h-screen w-full flex-col items-center justify-between border-2 border-border bg-white bg-[radial-gradient(#80808080_1px,transparent_1px)] shadow-light [background-size:16px_16px]">
-      <ThirdwebProvider>
-        <PageHeader title="Notifications" />
-        {role === USER_ROLE ? user : organization}
-        <PageFooter />
-        <ReactQueryDevtools />
-      </ThirdwebProvider>
+      <PageHeader title="Notifications" />
+      {role === USER_ROLE ? user : organization}
+      <PageFooter />
+      <ReactQueryDevtools />
     </div>
   );
 }

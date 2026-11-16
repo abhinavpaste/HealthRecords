@@ -2,6 +2,7 @@
 
 import { ClerkProvider } from "@clerk/nextjs";
 import React from "react";
+import { ThirdwebProvider } from "thirdweb/react";
 
 import {
   isServer,
@@ -41,7 +42,9 @@ export default function Providers({ children }: { children: React.ReactNode }) {
   const queryClient = getQueryClient();
   return (
     <ClerkProvider afterSignOutUrl="/" signInForceRedirectUrl="/dashboard">
-      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+      <QueryClientProvider client={queryClient}>
+        <ThirdwebProvider>{children}</ThirdwebProvider>
+      </QueryClientProvider>
     </ClerkProvider>
   );
 }

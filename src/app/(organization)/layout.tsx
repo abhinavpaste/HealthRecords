@@ -12,14 +12,14 @@ async function OrganizationLayout({ children }: { children: React.ReactNode }) {
   if (!role) redirect("/role-select");
   if (role !== ORG_ROLE) redirect("/");
   return (
-    <ThirdwebProvider>
+    <>
       {children}
       <ReactQueryDevtools
         position="bottom"
         buttonPosition="bottom-right"
         initialIsOpen={false}
       />
-    </ThirdwebProvider>
+    </>
   );
 }
 

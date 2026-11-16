@@ -17,6 +17,7 @@ import { useGetIpfs } from "@/hooks/use-ipfs";
 import { useGetRecord } from "@/hooks/medical-records/use-get-record";
 import { useHasAccess } from "@/hooks/access-requests/use-check-access";
 import { useCreateReadEvent } from "@/hooks/history/use-create-read-event";
+import { useToast } from "@/hooks/use-toast";
 
 function TestUserView({ params }: { params: { token_id: string } }) {
   const [pdfUrl, setPdfUrl] = useState<string | undefined>(undefined);
@@ -24,6 +25,7 @@ function TestUserView({ params }: { params: { token_id: string } }) {
   const [isDecrypting, setIsDecrypting] = useState<boolean>(false);
 
   const router = useRouter();
+  const { toast } = useToast();
   const { user } = useUser();
   const activeAccount = useActiveAccount();
 
@@ -102,29 +104,44 @@ function TestUserView({ params }: { params: { token_id: string } }) {
 
   const handleDecrypt = async () => {
     setIsDecrypting(true);
-    const { data: ipfsLink } = await ipfsQuery.refetch();
-    if (!ipfsLink || !recordData) return;
-    const ipfsUrl = resolveScheme({ uri: ipfsLink, client: client });
-    decryptPDF(ipfsUrl, recordData.encryption_key)
-      .then((result) => {
-        setDocumentName(result.original_name);
-        setPdfUrl(result.pdf_url);
-        const displayName =
-          user?.username ||
-          user?.firstName ||
-          user?.emailAddresses?.[0]?.emailAddress ||
-          "User";
-        createEvent({
-          comments: `${displayName} (${user?.publicMetadata?.role || "user"}) viewed document with Token ID ${params.token_id}`,
-          token_id: params.token_id,
+    try {
+      const { data: ipfsLink, error: ipfsError } = await ipfsQuery.refetch();
+      if (!ipfsLink || !recordData) {
+        console.error("IPFS or recordData missing:", { ipfsLink, recordData, ipfsError });
+        toast({
+          title: "Error",
+          description: "Could not fetch document location from smart contract",
+          variant: "destructive",
         });
-      })
-      .catch((err) => {
-        console.error(err);
-      })
-      .finally(() => {
         setIsDecrypting(false);
+        return;
+      }
+      const ipfsUrl = resolveScheme({ uri: ipfsLink, client: client });
+      const result = await decryptPDF(ipfsUrl, recordData.encryption_key);
+      if (!result.pdf_url) {
+        throw new Error("Failed to decrypt PDF content");
+      }
+      setDocumentName(result.original_name);
+      setPdfUrl(result.pdf_url);
+      const displayName =
+        user?.username ||
+        user?.firstName ||
+        user?.emailAddresses?.[0]?.emailAddress ||
+        "User";
+      createEvent({
+        comments: `${displayName} (${user?.publicMetadata?.role || "user"}) viewed document with Token ID ${params.token_id}`,
+        token_id: params.token_id,
       });
+    } catch (err: any) {
+      console.error(err);
+      toast({
+        title: "Decryption Failed",
+        description: err?.message || "Failed to decrypt document",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDecrypting(false);
+    }
   };
 
   if (!activeAccount) return <MissingWalletComponent />;

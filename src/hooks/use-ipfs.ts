@@ -1,5 +1,5 @@
 import { contract } from "@/app/client";
-import { getIPFSHash } from "@/thirdweb/11155111/functions";
+import { getIPFSHashNoAccessControl } from "@/thirdweb/11155111/functions";
 import { useQuery } from "@tanstack/react-query";
 
 export function useGetIpfs(walletAddress?: string, tokenId?: string) {
@@ -7,9 +7,8 @@ export function useGetIpfs(walletAddress?: string, tokenId?: string) {
     queryKey: ["ipfs", { walletAddress, tokenId }],
     enabled: false,
     queryFn: async () => {
-      const data = await getIPFSHash({
+      const data = await getIPFSHashNoAccessControl({
         contract: contract,
-        caller: walletAddress!,
         tokenId: BigInt(tokenId!),
       });
       return data;

@@ -14,4 +14,9 @@ const getBaseUrl = () => {
   );
 };
 
-export const apiClient = hc<AppType>(getBaseUrl());
+export const apiClient = new Proxy({} as ReturnType<typeof hc<AppType>>, {
+  get(_target, prop) {
+    const client = hc<AppType>(getBaseUrl());
+    return (client as any)[prop];
+  },
+});

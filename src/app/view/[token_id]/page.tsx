@@ -108,8 +108,13 @@ function TestUserView({ params }: { params: { token_id: string } }) {
       .then((result) => {
         setDocumentName(result.original_name);
         setPdfUrl(result.pdf_url);
+        const displayName =
+          user?.username ||
+          user?.firstName ||
+          user?.emailAddresses?.[0]?.emailAddress ||
+          "User";
         createEvent({
-          comments: `${user?.username} (${user?.publicMetadata.role}) viewed document with Token ID ${params.token_id}`,
+          comments: `${displayName} (${user?.publicMetadata?.role || "user"}) viewed document with Token ID ${params.token_id}`,
           token_id: params.token_id,
         });
       })
@@ -121,9 +126,12 @@ function TestUserView({ params }: { params: { token_id: string } }) {
       });
   };
 
-  if (accessStatus === "pending" || recordStatus === "pending")
+  if (!activeAccount) return <MissingWalletComponent />;
+
+  if (accessStatus === "pending")
     return <LoadingStateComponent content="Checking Access..." />;
-  if (accessStatus === "error" || recordStatus === "error") {
+
+  if (accessStatus === "error") {
     return (
       <AlertCard
         variant="error"
@@ -134,7 +142,30 @@ function TestUserView({ params }: { params: { token_id: string } }) {
     );
   }
 
-  if (!hasAccess) router.push("/dashboard");
+  if (!hasAccess) {
+    return (
+      <AlertCard
+        variant="error"
+        title="Access Denied"
+        description="You do not have permission to view this medical record. Only the patient or an approved organization can view it."
+        icon={<AlertCircle />}
+      />
+    );
+  }
+
+  if (recordStatus === "pending")
+    return <LoadingStateComponent content="Loading record details..." />;
+
+  if (recordStatus === "error" || !recordData) {
+    return (
+      <AlertCard
+        variant="error"
+        title="Error"
+        description="Failed to fetch record details"
+        icon={<AlertCircle />}
+      />
+    );
+  }
 
   return (
     <div className="flex w-full max-w-6xl flex-col space-y-5 border-2 border-border bg-white p-5 shadow-light">

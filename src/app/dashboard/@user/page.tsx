@@ -49,7 +49,14 @@ async function UserDashboard() {
     <div className="flex w-full max-w-6xl flex-col space-y-6 border-2 border-border bg-white px-8 py-10 shadow-light">
       <div className="flex flex-col space-y-2">
         <h1>
-          Welcome, <span className="font-heading">{user?.username}</span>!
+          Welcome,{" "}
+          <span className="font-heading">
+            {user?.username ||
+              user?.firstName ||
+              user?.emailAddresses?.[0]?.emailAddress?.split("@")[0] ||
+              "User"}
+          </span>
+          !
         </h1>
         <h2 className="text-sm font-base text-gray-700">
           Here you can access the functions available to you as a user

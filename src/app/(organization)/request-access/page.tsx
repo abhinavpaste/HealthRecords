@@ -59,9 +59,11 @@ export default function RequestAccessPage() {
       createNotification({
         token_id: values.token_id,
         message: values.comments,
+        wallet_address: activeAccount?.address,
       }).then(() => {
         createRequest({
           token_id: values.token_id,
+          wallet_address: activeAccount?.address,
         });
       });
     } catch (error) {

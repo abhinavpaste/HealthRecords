@@ -1,6 +1,7 @@
 import { db } from "@/db/drizzle";
 import { and, eq } from "drizzle-orm";
 import { medicalRecords, notifications, users } from "@/db/schema";
+import { clerkClient } from "@clerk/nextjs/server";
 
 import { USER_ROLE } from "@/types/roles";
 
@@ -94,6 +95,7 @@ const notificationsRouter = new Hono()
       z.object({
         token_id: z.string(),
         message: z.string(),
+        wallet_address: z.string().optional(),
       }),
     ),
     async (c) => {
@@ -102,9 +104,45 @@ const notificationsRouter = new Hono()
 
       if (!auth?.userId) return c.json({ error: "Unauthorized" }, 401);
 
-      const userData = await db.query.users.findFirst({
+      let userData = await db.query.users.findFirst({
         where: (user, { eq }) => eq(user.id, auth.userId),
       });
+
+      if (!userData) {
+        try {
+          const client = await clerkClient();
+          const clerkUser = await client.users.getUser(auth.userId);
+          const role =
+            (clerkUser.publicMetadata.role as
+              | "user"
+              | "medical_organization") || "medical_organization";
+          const email = clerkUser.emailAddresses[0]?.emailAddress;
+          const username =
+            clerkUser.username ||
+            email?.split("@")[0] ||
+            `org_${auth.userId.slice(-6)}`;
+          const wallet = postData.wallet_address;
+
+          if (wallet) {
+            const [created] = await db
+              .insert(users)
+              .values({
+                id: auth.userId,
+                role,
+                username,
+                wallet_address: wallet,
+              })
+              .onConflictDoUpdate({
+                target: users.id,
+                set: { role, wallet_address: wallet },
+              })
+              .returning();
+            userData = created;
+          }
+        } catch (e) {
+          console.error("Auto-heal user error in notifications:", e);
+        }
+      }
 
       if (!userData) return c.json({ error: "User not found" }, 404);
       if (userData.role === USER_ROLE)
@@ -113,8 +151,18 @@ const notificationsRouter = new Hono()
           400,
         );
 
+      const isUUID =
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+          postData.token_id,
+        );
       const recordData = await db.query.medicalRecords.findFirst({
-        where: (record, { eq }) => eq(record.token_id, postData.token_id),
+        where: (record, { eq, or }) =>
+          isUUID
+            ? or(
+                eq(record.id, postData.token_id),
+                eq(record.token_id, postData.token_id),
+              )
+            : eq(record.token_id, postData.token_id),
         columns: {
           id: true,
           user_id: true,

@@ -39,7 +39,31 @@ const usersRouter = new Hono()
         const data = await db.query.users.findFirst({
           where: (user, { eq }) => eq(user.id, id),
         });
-        if (!data) return c.json({ error: "User not found" }, 404);
+        if (!data) {
+          const client = await clerkClient();
+          const clerkUser = await client.users.getUser(id);
+          if (clerkUser) {
+            const role =
+              (clerkUser.publicMetadata.role as
+                | "user"
+                | "medical_organization") || "medical_organization";
+            const email = clerkUser.emailAddresses[0]?.emailAddress;
+            const username =
+              clerkUser.username ||
+              email?.split("@")[0] ||
+              `user_${id.slice(-6)}`;
+            return c.json({
+              data: {
+                id,
+                username,
+                role,
+                wallet_address: "Connected",
+                created_at: new Date(clerkUser.createdAt),
+              },
+            });
+          }
+          return c.json({ error: "User not found" }, 404);
+        }
         return c.json({ data });
       } catch (error) {
         return c.json({ error: "Internal Server Error" }, 500);

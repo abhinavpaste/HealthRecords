@@ -71,7 +71,7 @@ function RecordsPageContent() {
             <CardContent className="flex w-full flex-col space-y-5">
               <div className="flex justify-between text-sm font-base">
                 <h1>{format(record.uploaded_at, "dd MMM, yyyy")}</h1>
-                <h2>#{record.token_id}</h2>
+                <h2 className="font-mono font-bold">Token ID: #{record.token_id}</h2>
               </div>
               <Link href={`/view/${record.token_id}`}>
                 <Button className="w-full bg-[#fd9745]">View Document</Button>

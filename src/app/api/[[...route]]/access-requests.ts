@@ -7,7 +7,8 @@ import { zValidator } from "@hono/zod-validator";
 
 import { db } from "@/db/drizzle";
 import { and, eq } from "drizzle-orm";
-import { accessRequests, notifications } from "@/db/schema";
+import { accessRequests, notifications, users } from "@/db/schema";
+import { clerkClient } from "@clerk/nextjs/server";
 
 import { z } from "zod";
 
@@ -91,25 +92,71 @@ const accessRequestsRouter = new Hono()
       "json",
       z.object({
         token_id: z.string().optional(),
+        wallet_address: z.string().optional(),
       }),
     ),
     async (c) => {
       const auth = getAuth(c);
-      const { token_id } = c.req.valid("json");
+      const postData = c.req.valid("json");
+      const { token_id } = postData;
       if (!auth?.userId) return c.json({ error: "Unauthorized" }, 401);
       if (!token_id) return c.json({ error: "Token ID is required" }, 400);
 
-      const userData = await db.query.users.findFirst({
+      let userData = await db.query.users.findFirst({
         where: (record, { eq, and }) =>
           and(
             eq(record.id, auth.userId),
             eq(record.role, "medical_organization"),
           ),
       });
+
+      if (!userData) {
+        try {
+          const client = await clerkClient();
+          const clerkUser = await client.users.getUser(auth.userId);
+          const role =
+            (clerkUser.publicMetadata.role as
+              | "user"
+              | "medical_organization") || "medical_organization";
+          const email = clerkUser.emailAddresses[0]?.emailAddress;
+          const username =
+            clerkUser.username ||
+            email?.split("@")[0] ||
+            `org_${auth.userId.slice(-6)}`;
+          const wallet = postData.wallet_address;
+
+          if (wallet && role === "medical_organization") {
+            const [created] = await db
+              .insert(users)
+              .values({
+                id: auth.userId,
+                role,
+                username,
+                wallet_address: wallet,
+              })
+              .onConflictDoUpdate({
+                target: users.id,
+                set: { role, wallet_address: wallet },
+              })
+              .returning();
+            userData = created;
+          }
+        } catch (e) {
+          console.error("Auto-heal user error in access-requests:", e);
+        }
+      }
+
       if (!userData) return c.json({ error: "Invalid user" }, 400);
 
+      const isUUID =
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+          token_id,
+        );
       const recordData = await db.query.medicalRecords.findFirst({
-        where: (record, { eq }) => eq(record.token_id, token_id),
+        where: (record, { eq, or }) =>
+          isUUID
+            ? or(eq(record.id, token_id), eq(record.token_id, token_id))
+            : eq(record.token_id, token_id),
       });
 
       if (!recordData) return c.json({ error: "Record not found" }, 404);
@@ -217,8 +264,15 @@ const accessRequestsRouter = new Hono()
       if (!token_id || !status || !org_name)
         return c.json({ error: "Missing required fields" }, 400);
 
+      const isUUID =
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+          token_id,
+        );
       const recordData = await db.query.medicalRecords.findFirst({
-        where: (record, { eq }) => eq(record.token_id, token_id),
+        where: (record, { eq, or }) =>
+          isUUID
+            ? or(eq(record.id, token_id), eq(record.token_id, token_id))
+            : eq(record.token_id, token_id),
       });
       const orgData = await db.query.users.findFirst({
         where: (user, { eq }) => eq(user.username, org_name),

@@ -190,7 +190,9 @@ function TestUserView({ params }: { params: { token_id: string } }) {
       <h1 className="font-bold">Document for Token ID {params.token_id}</h1>
       <div className="flex justify-between">
         <h2 className="text-sm font-base">{recordData.title}</h2>
-        <h2 className="text-sm font-base">{recordData.id}</h2>
+        <h2 className="text-sm font-base font-mono font-bold">
+          Token ID: #{params.token_id}
+        </h2>
       </div>
       {!pdfUrl && (
         <Button

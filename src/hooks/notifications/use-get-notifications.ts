@@ -19,6 +19,8 @@ export const useGetUserNotifications = (
   const query = useQuery<UserNotifications, Error>({
     queryKey: ["notifications", { id }],
     enabled: !!id && !!wallet_address,
+    refetchOnWindowFocus: "always",
+    refetchInterval: 5000,
     queryFn: async () => {
       const response = await apiClient.api.notifications.user.$get();
       if (!response.ok) throw new Error("Failed to fetch user notifications");
